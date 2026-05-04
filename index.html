@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f766e" />
+  <title>eTravel bilety</title>
+  <style>
+    :root {
+      --bg: #f3f4f6;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --line: #dbe2ea;
+      --accent: #0f766e;
+      --danger: #b91c1c;
+      --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, Arial, sans-serif; background: var(--bg); color: var(--text); }
+    body { min-height: 100vh; }
+    button, input { font: inherit; }
+    .app { max-width: 760px; margin: 0 auto; padding: 16px 16px 96px; }
+    .topbar { position: sticky; top: 0; z-index: 30; backdrop-filter: blur(12px); background: rgba(243,244,246,.86); padding: 8px 0 12px; display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+    .title { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
+    .subtitle { font-size: 14px; color: var(--muted); margin-top: 4px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; }
+    .upload { display: grid; gap: 12px; margin-top: 16px; }
+    .upload input { display:none; }
+    .btn { min-height: 46px; border-radius: 14px; border: 0; padding: 12px 16px; font-weight: 700; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-secondary { background: #e2e8f0; color: var(--text); }
+    .btn-danger { background: #fee2e2; color: var(--danger); }
+    .menu-wrap { position: relative; }
+    .icon-btn { width: 46px; height: 46px; border-radius: 14px; border: 1px solid var(--line); background:#fff; display:grid; place-items:center; box-shadow: var(--shadow); }
+    .menu-panel { position:absolute; right:0; top:54px; width:min(280px, 80vw); background:#fff; border:1px solid var(--line); border-radius:18px; box-shadow: var(--shadow); padding:10px; display:none; }
+    .menu-panel.open { display:grid; gap:8px; }
+    .menu-action { width:100%; text-align:left; padding:14px; border-radius:14px; border:0; background:#f8fafc; color:var(--text); font-weight:700; }
+    .menu-action.danger { background:#fff1f2; color:var(--danger); }
+    .tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(140px,1fr); gap: 10px; overflow-x: auto; padding-bottom: 4px; margin: 16px 0; }
+    .tab { text-align: left; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--line); background: #fff; min-height: 74px; }
+    .tab.active { border-color: var(--accent); background: #ecfeff; }
+    .tab small { color: var(--muted); display:block; }
+    .tab strong { display:block; margin-top: 4px; }
+    .hero { display: grid; gap: 16px; }
+    .relation { font-size: 24px; font-weight: 800; line-height: 1.15; }
+    .meta-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+    .meta { background: #f8fafc; border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+    .meta .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+    .meta .value { margin-top: 6px; font-size: 18px; font-weight: 800; }
+    .qr-area { display: grid; gap: 12px; justify-items: center; }
+    .qr-frame { width: min(100%, 360px); background: white; border-radius: 18px; padding: 14px; border: 1px solid var(--line); }
+    .qr-frame canvas, .qr-frame img { width: 100%; height: auto; display: block; image-rendering: pixelated; }
+    .zoom-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+    .viewer { position: fixed; inset: 0; background: rgba(2,6,23,.92); display: none; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
+    .viewer.open { display: flex; }
+    .viewer-inner { width: min(100%, 560px); }
+    .viewer-box { background: white; border-radius: 24px; padding: 18px; }
+    .viewer-box canvas, .viewer-box img { width: 100%; height: auto; display: block; image-rendering: pixelated; }
+    .viewer-controls { display:flex; justify-content:center; margin-top: 14px; }
+    .empty { text-align: center; padding: 28px 18px; color: var(--muted); }
+    .footer-note { margin-top: 16px; font-size: 13px; color: var(--muted); }
+    @media (max-width: 520px) {
+      .app { padding-left: 12px; padding-right: 12px; }
+      .relation { font-size: 21px; }
+      .meta-grid { grid-template-columns: 1fr 1fr; }
+      .title { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="viewer" id="viewer" aria-hidden="true">
+    <div class="viewer-inner">
+      <div class="viewer-box"><div id="viewerContent"></div></div>
+      <div class="viewer-controls"><button class="btn btn-secondary" id="closeViewer">Zamknij</button></div>
+    </div>
+  </div>
+
+  <main class="app">
+    <div class="topbar">
+      <div>
+        <div class="title">eTravel bilety</div>
+        <div class="subtitle">Lokalna apka do podglądu biletów i QR.</div>
+      </div>
+      <div class="menu-wrap">
+        <button class="icon-btn" id="menuToggle" aria-label="Otwórz menu" aria-expanded="false">☰</button>
+        <div class="menu-panel" id="menuPanel">
+          <button class="menu-action" id="menuAddTicket">Dodaj bilet PDF</button>
+          <button class="menu-action danger" id="menuClearAll">Usuń wszystkie bilety</button>
+        </div>
+      </div>
+    </div>
+
+    <section class="card upload">
+      <div>
+        <strong>Bilety PDF</strong>
+        <div class="subtitle">Nowe PDF-y z eTravel dodasz z menu.</div>
+      </div>
+      <input id="fileInput" type="file" accept="application/pdf" multiple />
+    </section>
+
+    <section id="tabsWrap" class="tabs" aria-label="Lista biletów"></section>
+
+    <section id="ticketCard" class="card hero" hidden>
+      <div>
+        <div class="relation" id="relation"></div>
+        <div class="subtitle" id="dateLine"></div>
+      </div>
+      <div class="meta-grid">
+        <div class="meta"><div class="label">Przew. i poc.</div><div class="value" id="carrierTrain"></div></div>
+        <div class="meta"><div class="label">Wagon / miejsce</div><div class="value" id="seatInfo"></div></div>
+        <div class="meta"><div class="label">Odjazd</div><div class="value" id="dep"></div></div>
+        <div class="meta"><div class="label">Przyjazd</div><div class="value" id="arr"></div></div>
+      </div>
+      <div class="qr-area">
+        <div class="qr-frame" id="qrFrame"></div>
+        <div class="zoom-actions">
+          <button class="btn btn-primary" id="openViewer">Pokaż QR</button>
+          <button class="btn btn-secondary" id="showSource">Pokaż bilet</button>
+          <button class="btn btn-secondary" id="addCalendar">Dodaj do kalendarza</button>
+          <button class="btn btn-danger" id="removeTicket">Usuń ten bilet</button>
+        </div>
+      </div>
+      <div class="footer-note" id="statusLine"></div>
+    </section>
+
+    <section id="emptyState" class="card empty">Dodaj pliki PDF z eTravel z menu, aby zobaczyć podgląd i wycięty kod QR.</section>
+  </main>
+
+  <script type="module">
+    import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
+
+    const state = { tickets: [], activeId: null, pruneTimer: null };
+    const els = {
+      fileInput: document.getElementById('fileInput'),
+      tabsWrap: document.getElementById('tabsWrap'),
+      ticketCard: document.getElementById('ticketCard'),
+      emptyState: document.getElementById('emptyState'),
+      relation: document.getElementById('relation'),
+      dateLine: document.getElementById('dateLine'),
+      carrierTrain: document.getElementById('carrierTrain'),
+      seatInfo: document.getElementById('seatInfo'),
+      dep: document.getElementById('dep'),
+      arr: document.getElementById('arr'),
+      qrFrame: document.getElementById('qrFrame'),
+      statusLine: document.getElementById('statusLine'),
+      viewer: document.getElementById('viewer'),
+      viewerContent: document.getElementById('viewerContent'),
+      closeViewer: document.getElementById('closeViewer'),
+      openViewer: document.getElementById('openViewer'),
+      showSource: document.getElementById('showSource'),
+      addCalendar: document.getElementById('addCalendar'),
+      removeTicket: document.getElementById('removeTicket'),
+      menuToggle: document.getElementById('menuToggle'),
+      menuPanel: document.getElementById('menuPanel'),
+      menuAddTicket: document.getElementById('menuAddTicket'),
+      menuClearAll: document.getElementById('menuClearAll')
+    };
+
+    function setUploadStatus(message, type = 'info') {
+      const el = document.getElementById('uploadStatus');
+      if (!el) return;
+      el.textContent = message || '';
+      el.dataset.state = type;
+    }
+
+    async function readPdfTextAllPages(file) {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+      let out = '';
+      for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
+        const page = await pdf.getPage(pageNo);
+        const text = await page.getTextContent();
+        out += ' ' + text.items.map(i => i.str).join(' ');
+      }
+      return out.replace(/\s+/g, ' ').trim();
+    }
+
+    async function fileToDataUrl(file) {
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('read failed'));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function parseTravelDateTime(dateStr, timeStr) {
+      const match = `${dateStr || ''} ${timeStr || ''}`.match(/(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})/);
+      if (!match) return null;
+      const [, dd, mm, yyyy, hh, min] = match;
+      return new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(min));
+    }
+
+    function enrichTicketTimes(ticket) {
+      ticket.departureAt = parseTravelDateTime(ticket.date, ticket.departure);
+      ticket.arrivalAt = parseTravelDateTime(ticket.date, ticket.arrival);
+      return ticket;
+    }
+
+    function sortTickets() {
+      state.tickets.sort((a, b) => (a.departureAt?.getTime?.() ?? Number.MAX_SAFE_INTEGER) - (b.departureAt?.getTime?.() ?? Number.MAX_SAFE_INTEGER));
+    }
+
+    function pruneArrivedTickets() {
+      const now = Date.now();
+      const activeBefore = state.activeId;
+      state.tickets = state.tickets.filter(ticket => !ticket.arrivalAt || ticket.arrivalAt.getTime() > now);
+      if (!state.tickets.some(t => t.id === activeBefore)) state.activeId = state.tickets[0]?.id || null;
+      sortTickets();
+    }
+
+    function schedulePrune() {
+      if (state.pruneTimer) clearTimeout(state.pruneTimer);
+      state.pruneTimer = null;
+      const arrivals = state.tickets.map(t => t.arrivalAt?.getTime?.()).filter(Boolean).sort((a,b) => a-b);
+      const nextArrival = arrivals.find(ts => ts > Date.now());
+      if (!nextArrival) return;
+      const delay = Math.max(1000, Math.min(nextArrival - Date.now() + 1000, 2147483647));
+      state.pruneTimer = setTimeout(() => { pruneArrivedTickets(); render(); }, delay);
+    }
+
+    function parseTicketText(text, filename='') {
+      const normalized = text.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+      const travelRowMatch = normalized.match(/([A-ZĄĆĘŁŃÓŚŹŻ][A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż .-]{2,40})\s*(?:->|→)\s*([A-ZĄĆĘŁŃÓŚŹŻ][A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż .-]{2,40})\s+(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})\s+(\d{2}\.\d{2}\.\d{4})\s+(PKP\s*IC)\s+((?:EIP|EIC|IC|TLK|REGIO|IR)\s*\d{2,5})\s+(\d)\s+(\d{1,2})\s+Wagon[^\d]*(\d{1,3})(?:\s+(okno|środek|korytarz))?/i);
+      const routeOnlyMatch = normalized.match(/([A-ZĄĆĘŁŃÓŚŹŻ][A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż .-]{2,40})\s*(?:->|→)\s*([A-ZĄĆĘŁŃÓŚŹŻ][A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż .-]{2,40})/i);
+      const timeMatch = normalized.match(/(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})/);
+      const dateMatch = normalized.match(/(\d{2}\.\d{2}\.\d{4})/);
+      const carrierTrainMatch = normalized.match(/(PKP\s*IC)\s+((?:EIP|EIC|IC|TLK|REGIO|IR)\s*\d{2,5})/i);
+      const wagonMatch = normalized.match(/(?:^|\s)(\d{1,2})\s+Wagon\s+bezprzedziałowy/i) || normalized.match(/wagon\s*(\d{1,2})/i);
+      const seatMatch = normalized.match(/miejsca?\s*(\d{1,3})(?:\s+(okno|środek|korytarz))?/i) || normalized.match(/(?:^|\s)(\d{1,3})\s+(okno|środek|korytarz)(?:\s|$)/i);
+      const refMatch = normalized.match(/Nr referencyjny:?\s*(\d+)/i);
+      const ticketNoMatch = normalized.match(/Bilet nr\s*([A-Z]{1,3}\s*\d+)/i);
+
+      const from = travelRowMatch?.[1] || routeOnlyMatch?.[1] || 'Nie wykryto relacji';
+      const to = travelRowMatch?.[2] || routeOnlyMatch?.[2] || '';
+      const departure = travelRowMatch?.[3] || timeMatch?.[1] || '—';
+      const arrival = travelRowMatch?.[4] || timeMatch?.[2] || '—';
+      const date = travelRowMatch?.[5] || dateMatch?.[1] || '—';
+      const carrier = travelRowMatch?.[6] || carrierTrainMatch?.[1] || 'PKP IC';
+      const fullTrain = travelRowMatch?.[7] || carrierTrainMatch?.[2] || '—';
+      const trainParts = fullTrain.match(/(EIP|EIC|IC|TLK|REGIO|IR)\s*(\d{2,5})/i);
+      const wagon = travelRowMatch?.[9] || wagonMatch?.[1] || '—';
+      const seatNo = travelRowMatch?.[10] || seatMatch?.[1] || '—';
+      const seatKind = travelRowMatch?.[11] || seatMatch?.[2] || '';
+      const relation = to ? `${from} → ${to}` : from;
+
+      return enrichTicketTimes({
+        id: crypto.randomUUID(),
+        filename,
+        date,
+        relation,
+        direction: relation,
+        departure,
+        arrival,
+        carrier,
+        trainType: trainParts?.[1] || '—',
+        trainNo: trainParts?.[2] || '—',
+        wagon: String(wagon || '—').replace(/[^0-9—]/g, ''),
+        seat: String(seatNo || '—').replace(/[^0-9—]/g, ''),
+        ticketNo: ticketNoMatch?.[1] || '',
+        refNo: refMatch?.[1] || '',
+        status: 'Dane biletu odczytane z PDF eTravel/PKP.'
+      });
+    }
+
+    async function renderPdfPage(fileOrBuffer) {
+      const bytes = fileOrBuffer instanceof Uint8Array ? fileOrBuffer : new Uint8Array(await fileOrBuffer.arrayBuffer());
+      const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+      const page = await pdf.getPage(1);
+      const viewport = page.getViewport({ scale: 2.5 });
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      const text = await page.getTextContent();
+      return { canvas, text: text.items.map(i => i.str).join(' ') };
+    }
+
+    function cropQrFromCanvas(sourceCanvas) {
+      const w = sourceCanvas.width, h = sourceCanvas.height;
+      const sx = Math.floor(w * 0.03), sy = Math.floor(h * 0.30), sw = Math.floor(w * 0.34), sh = Math.floor(h * 0.28);
+      const ctx = sourceCanvas.getContext('2d', { willReadFrequently: true });
+      const imageData = ctx.getImageData(sx, sy, sw, sh), data = imageData.data;
+      let minX = sw, minY = sh, maxX = 0, maxY = 0, found = false;
+      for (let y=0; y<sh; y++) for (let x=0; x<sw; x++) {
+        const i = (y * sw + x) * 4;
+        const avg = (data[i] + data[i+1] + data[i+2]) / 3;
+        if (avg < 120) { found = true; minX = Math.min(minX,x); minY = Math.min(minY,y); maxX = Math.max(maxX,x); maxY = Math.max(maxY,y); }
+      }
+      const out = document.createElement('canvas');
+      const octx = out.getContext('2d');
+      if (!found) {
+        out.width = sw; out.height = sh;
+        octx.fillStyle = '#fff'; octx.fillRect(0,0,sw,sh);
+        octx.drawImage(sourceCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+        return out;
+      }
+      const pad = 24;
+      const cw = Math.min(sw, (maxX - minX) + pad * 2);
+      const ch = Math.min(sh, (maxY - minY) + pad * 2);
+      const startX = Math.max(0, minX - pad);
+      const startY = Math.max(0, minY - pad);
+      const size = Math.max(cw, ch);
+      out.width = size; out.height = size;
+      octx.fillStyle = '#fff'; octx.fillRect(0,0,size,size);
+      octx.drawImage(sourceCanvas, sx + startX, sy + startY, Math.min(size, sw - startX), Math.min(size, sh - startY), 0, 0, size, size);
+      return out;
+    }
+
+    async function processPdfFile(file) {
+      const { canvas, text } = await renderPdfPage(file);
+      const ticket = parseTicketText(text, file.name);
+      ticket.pageCanvas = canvas;
+      ticket.qrCanvas = cropQrFromCanvas(canvas);
+      return ticket;
+    }
+
+    function activeTicket() { return state.tickets.find(t => t.id === state.activeId) || null; }
+
+    function cloneCanvas(src) {
+      const c = document.createElement('canvas');
+      c.width = src.width; c.height = src.height;
+      c.getContext('2d').drawImage(src,0,0);
+      return c;
+    }
+
+    function renderTabs() {
+      els.tabsWrap.innerHTML = '';
+      state.tickets.forEach(ticket => {
+        const btn = document.createElement('button');
+        btn.className = 'tab' + (ticket.id === state.activeId ? ' active' : '');
+        btn.innerHTML = `<small>${ticket.date || 'bez daty'}</small><strong>${ticket.relation}</strong><small>${ticket.trainType} ${ticket.trainNo}</small>`;
+        btn.addEventListener('click', () => { state.activeId = ticket.id; render(); });
+        els.tabsWrap.appendChild(btn);
+      });
+    }
+
+    function renderTicket() {
+      const ticket = activeTicket();
+      if (!ticket) {
+        els.ticketCard.hidden = true;
+        els.emptyState.hidden = false;
+        els.qrFrame.innerHTML = '';
+        els.dateLine.textContent = '';
+        els.relation.textContent = '';
+        els.carrierTrain.textContent = '';
+        els.seatInfo.textContent = '';
+        els.dep.textContent = '';
+        els.arr.textContent = '';
+        els.statusLine.textContent = '';
+        return;
+      }
+      els.ticketCard.hidden = false;
+      els.emptyState.hidden = true;
+      els.relation.textContent = ticket.relation;
+      els.dateLine.textContent = `${ticket.date} · ${ticket.filename || 'bilet'}`;
+      els.carrierTrain.textContent = `${ticket.carrier} · ${ticket.trainType} ${ticket.trainNo}`;
+      els.seatInfo.textContent = `${ticket.wagon} / ${ticket.seat}`;
+      els.dep.textContent = ticket.departure;
+      els.arr.textContent = ticket.arrival;
+      const autoRemoveNote = ticket.arrivalAt ? ` Bilet zniknie automatycznie po ${ticket.arrival}.` : '';
+      els.statusLine.textContent = ticket.status + (ticket.refNo ? ` Ref: ${ticket.refNo}.` : '') + autoRemoveNote;
+      els.qrFrame.innerHTML = '';
+      if (ticket.qrCanvas) els.qrFrame.appendChild(cloneCanvas(ticket.qrCanvas));
+    }
+
+    function render() {
+      pruneArrivedTickets();
+      sortTickets();
+      renderTabs();
+      renderTicket();
+      schedulePrune();
+    }
+
+    async function addFiles(files) {
+      for (const file of files) {
+        try {
+          const ticket = await processPdfFile(file);
+          state.tickets.push(ticket);
+          sortTickets();
+          state.activeId = ticket.id;
+        } catch (err) {
+          alert(`Nie udało się przetworzyć pliku ${file.name}. Upewnij się, że to PDF z eTravel.\n\n${err.message}`);
+        }
+      }
+      render();
+    }
+
+    function drawPseudoQr(text) {
+      const size = 420, cells = 41, cell = Math.floor(size / cells);
+      const canvas = document.createElement('canvas');
+      canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0,0,size,size);
+      const bytes = new TextEncoder().encode(text);
+      let seed = bytes.reduce((a,b,i)=> (a + b*(i+1)) % 2147483647, 7);
+      const rnd = () => (seed = seed * 48271 % 2147483647) / 2147483647;
+      function finder(x, y) {
+        ctx.fillStyle='#000'; ctx.fillRect(x*cell, y*cell, 7*cell, 7*cell);
+        ctx.fillStyle='#fff'; ctx.fillRect((x+1)*cell, (y+1)*cell, 5*cell, 5*cell);
+        ctx.fillStyle='#000'; ctx.fillRect((x+2)*cell, (y+2)*cell, 3*cell, 3*cell);
+      }
+      finder(1,1); finder(cells-8,1); finder(1,cells-8);
+      ctx.fillStyle='#000';
+      for (let y=0;y<cells;y++) for (let x=0;x<cells;x++) {
+        const inFinder = (x>=1&&x<8&&y>=1&&y<8) || (x>=cells-8&&x<cells-1&&y>=1&&y<8) || (x>=1&&x<8&&y>=cells-8&&y<cells-1);
+        if (!inFinder && rnd() > 0.5) ctx.fillRect(x*cell, y*cell, cell, cell);
+      }
+      return canvas;
+    }
+
+    function drawSampleQr() {
+      state.tickets.forEach(t => { if (!t.qrCanvas) t.qrCanvas = drawPseudoQr(t.qrPayload || t.relation); });
+    }
+
+    function openCanvasInViewer(canvas) {
+      els.viewerContent.innerHTML = '';
+      els.viewerContent.appendChild(cloneCanvas(canvas));
+      els.viewer.classList.add('open');
+      els.viewer.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeMenu() {
+      els.menuPanel.classList.remove('open');
+      els.menuToggle.setAttribute('aria-expanded', 'false');
+    }
+
+    function toICSDate(date) {
+      const pad = n => String(n).padStart(2, '0');
+      return `${date.getFullYear()}${pad(date.getMonth()+1)}${pad(date.getDate())}T${pad(date.getHours())}${pad(date.getMinutes())}00`;
+    }
+
+    function escapeICS(text) {
+      return String(text || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+    }
+
+    function downloadICS(ticket) {
+      if (!ticket?.departureAt || !ticket?.arrivalAt) {
+        alert('Brakuje daty lub godziny do utworzenia wpisu kalendarza.');
+        return;
+      }
+      const summary = `${ticket.carrier} ${ticket.trainType} ${ticket.trainNo} · ${ticket.relation}`;
+      const description = [
+        `Bilet: ${ticket.ticketNo || ticket.filename || 'eTravel'}`,
+        `Relacja: ${ticket.relation}`,
+        `Przewoźnik i pociąg: ${ticket.carrier} ${ticket.trainType} ${ticket.trainNo}`,
+        `Wagon i miejsce: ${ticket.wagon}, ${ticket.seat}`,
+        ticket.refNo ? `Nr referencyjny: ${ticket.refNo}` : ''
+      ].filter(Boolean).join('\n');
+      const location = ticket.relation.replace(' → ', ' - ');
+      const ics = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//eTravel bilety//PL',
+        'BEGIN:VEVENT',
+        `UID:${ticket.id}@etravel-bilety.local`,
+        `DTSTAMP:${toICSDate(new Date())}`,
+        `DTSTART:${toICSDate(ticket.departureAt)}`,
+        `DTEND:${toICSDate(ticket.arrivalAt)}`,
+        `SUMMARY:${escapeICS(summary)}`,
+        `DESCRIPTION:${escapeICS(description)}`,
+        `LOCATION:${escapeICS(location)}`,
+        'END:VEVENT',
+        'END:VCALENDAR'
+      ].join('\r\n');
+      const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${(ticket.trainType || 'pociag').toLowerCase()}-${ticket.trainNo || 'bilet'}.ics`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    }
+
+    els.fileInput.addEventListener('change', async e => {
+      const files = [...e.target.files];
+      if (files.length) await addFiles(files);
+      e.target.value = '';
+    });
+
+    els.openViewer.addEventListener('click', () => {
+      const ticket = activeTicket();
+      if (ticket?.qrCanvas) openCanvasInViewer(ticket.qrCanvas);
+    });
+
+    els.showSource.addEventListener('click', () => {
+      const ticket = activeTicket();
+      if (ticket?.pageCanvas) openCanvasInViewer(ticket.pageCanvas);
+    });
+
+    els.addCalendar.addEventListener('click', () => {
+      const ticket = activeTicket();
+      if (ticket) downloadICS(ticket);
+    });
+
+    els.closeViewer.addEventListener('click', () => {
+      els.viewer.classList.remove('open');
+      els.viewer.setAttribute('aria-hidden', 'true');
+      els.viewerContent.innerHTML = '';
+    });
+
+    els.viewer.addEventListener('click', e => {
+      if (e.target === els.viewer) els.closeViewer.click();
+    });
+
+    els.removeTicket.addEventListener('click', () => {
+      const current = activeTicket();
+      if (!current) return;
+      state.tickets = state.tickets.filter(t => t.id !== current.id);
+      sortTickets();
+      state.activeId = state.tickets[0]?.id || null;
+      render();
+    });
+
+    els.menuToggle.addEventListener('click', () => {
+      const open = els.menuPanel.classList.toggle('open');
+      els.menuToggle.setAttribute('aria-expanded', String(open));
+    });
+
+    els.menuAddTicket.addEventListener('click', () => {
+      closeMenu();
+      els.fileInput.click();
+    });
+
+    els.menuClearAll.addEventListener('click', () => {
+      closeMenu();
+      state.tickets = [];
+      state.activeId = null;
+      state.pruneTimer = null;
+      if (state.pruneTimer) clearTimeout(state.pruneTimer);
+      els.tabsWrap.innerHTML = '';
+      els.qrFrame.innerHTML = '';
+      els.viewerContent.innerHTML = '';
+      els.viewer.classList.remove('open');
+      els.viewer.setAttribute('aria-hidden', 'true');
+      els.ticketCard.hidden = true;
+      els.emptyState.hidden = false;
+      els.relation.textContent = '';
+      els.dateLine.textContent = '';
+      els.carrierTrain.textContent = '';
+      els.seatInfo.textContent = '';
+      els.dep.textContent = '';
+      els.arr.textContent = '';
+      els.statusLine.textContent = '';
+      render();
+    });
+
+    document.addEventListener('click', e => {
+      if (!els.menuPanel.contains(e.target) && !els.menuToggle.contains(e.target)) closeMenu();
+    });
+
+    render();
+  </script>
+<!-- hosting-ready -->
+</body>
+</html>
